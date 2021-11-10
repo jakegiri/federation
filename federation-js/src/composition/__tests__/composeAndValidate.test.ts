@@ -921,6 +921,45 @@ describe('composition of schemas with directives', () => {
       );
     }
   });
+
+  it('should merge @tag on Object Type fields', () => {
+    const users = {
+      name: 'users',
+      url: 'https://users.api.com',
+      typeDefs: gql`
+        directive @tag(
+          name: String!
+        ) repeatable on FIELD_DEFINITION | INTERFACE | OBJECT | UNION
+
+        extend type Product @key(fields: "upc") {
+          upc: String @external
+        }
+      `,
+    };
+
+    const products = {
+      name: 'products',
+      url: 'https://products.api.com',
+      typeDefs: gql`
+        directive @tag(
+          name: String!
+        ) repeatable on FIELD_DEFINITION | INTERFACE | OBJECT | UNION
+        extend type Query {
+          topProducts: [Product]
+        }
+        type Product @key(fields: "upc") {
+          upc: String @tag(name: "internal")
+        }
+      `,
+    };
+    const compositionResult = composeAndValidate([users, products]);
+    expect(compositionHasErrors(compositionResult)).toBe(false);
+    expect(compositionResult.schema.getType('Product')?.astNode).toMatchInlineSnapshot(`
+      type Product @key(fields: "upc") {
+        upc: String @tag(name: "internal")
+      }
+    `);
+  });
 });
 
 it('composition of full-SDL schemas without any errors', () => {
